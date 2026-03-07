@@ -1,0 +1,23 @@
+# Copy this file to terraform.tfvars and customize
+# cp terraform.tfvars.example terraform.tfvars
+
+aws_region   = "us-east-1"
+project_name = "zerotrust"
+environment  = "production"
+
+# --- EKS ---
+cluster_name       = "zerotrust-eks"
+kubernetes_version = "1.33"
+node_instance_types = ["t3.xlarge"]
+node_min_size      = 2
+node_max_size      = 3
+node_desired_size  = 2
+
+# --- RDS ---
+db_instance_class    = "db.t3.micro"
+db_name              = "awx"
+db_username          = "awxadmin"
+db_allocated_storage = 20
+
+# --- VPC ---
+vpc_cidr = "10.0.0.0/16"

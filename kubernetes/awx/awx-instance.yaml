@@ -1,0 +1,48 @@
+---
+apiVersion: awx.ansible.com/v1beta1
+kind: AWX
+metadata:
+  name: awx
+  namespace: awx
+spec:
+  replicas: 1
+
+  # External PostgreSQL (RDS)
+  postgres_configuration_secret: awx-postgres-configuration
+
+  # Ingress via ALB
+  ingress_type: ingress
+  ingress_class_name: alb
+  ingress_annotations: |
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
+
+  # Admin user
+  admin_user: admin
+  admin_password_secret: awx-admin-password
+
+  # Resource requests
+  web_resource_requirements:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+  task_resource_requirements:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+  ee_resource_requirements:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi

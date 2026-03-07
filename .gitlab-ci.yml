@@ -1,0 +1,12 @@
+stages:
+  - deploy
+
+deploy_awx:
+  stage: deploy
+  image: curlimages/curl:latest
+  script:
+    - |
+      curl -X POST \
+      http://k8s-awx-awxingre-c9c7e04833-923545306.us-east-1.elb.amazonaws.com/api/v2/job_templates/10/launch/ \
+      -H "Authorization: Bearer $AWX_TOKEN" \
+      -H "Content-Type: application/json"

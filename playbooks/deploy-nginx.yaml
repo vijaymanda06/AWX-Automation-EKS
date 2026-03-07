@@ -1,0 +1,26 @@
+---
+- name: Deploy Nginx on EC2 fleet via SSM
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  tasks:
+
+    - name: Install AWS CLI
+      pip:
+        name: awscli
+        executable: pip3
+
+    - name: Deploy nginx container on EC2 fleet
+      shell: |
+        python3 -m awscli ssm send-command \
+        --document-name "AWS-RunShellScript" \
+        --targets "Key=tag:Role,Values=web-fleet" \
+        --parameters '{"commands":[
+        "sudo apt update -y",
+        "sudo apt install -y docker.io",
+        "sudo systemctl enable docker",
+        "sudo systemctl start docker",
+        "sudo docker run -d -p 80:80 --name nginx nginx"
+        ]}' \
+        --region us-east-1
