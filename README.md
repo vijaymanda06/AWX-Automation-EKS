@@ -68,7 +68,18 @@ I also added some security improvements like restricting outbound network access
 
 So the overall flow looks like this:
 
-`GitLab CI pipeline → AWX API → Ansible playbook → AWS SSM → Private EC2 fleet`
+```text
+[Packer locally] → Golden AMI
+Terraform → VPC + EKS + RDS + Secrets Manager
+GitLab CI → AWX API → Ansible → SSM → Private EC2 fleet
+```
+
+## GitLab CI Pipeline
+
+The `.gitlab-ci.yml` triggers the automation flow. It:
+- Authenticates to AWX using a stored CI variable (`AWX_TOKEN`)
+- Calls the AWX API to launch a Job Template by ID
+- Waits for the job to complete and checks the status
 
 ## 1️⃣ Kubernetes Nodes (EKS)
 
@@ -259,6 +270,7 @@ Once everything is inside the cluster, it becomes easier to integrate with other
 │   │   └── awx-secrets.yaml        # ExternalSecrets for DB + admin
 │   └── argocd-apps/
 │       └── awx.yaml                # ArgoCD Application for AWX
+├── collections/                    # Contains required Ansible collections (community.aws) used by playbooks for SSM
 └── packer/                         # EC2 Golden AMI
     ├── aws-ubuntu.pkr.hcl
     └── setup-scripts/
