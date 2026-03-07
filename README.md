@@ -12,16 +12,14 @@ So the idea of this project was to build a central automation platform that can 
 
 ## What AWX / Ansible Tower is
 
-AWX is basically a web-based automation platform for Ansible. Instead of running Ansible from your laptop or CLI, AWX gives you a UI, API, inventory management, job scheduling, logging, and role-based access control.
+AWX is the open-source upstream project for Ansible Tower (now Red Hat Ansible Automation Platform). It is basically a web-based automation platform for Ansible. Instead of running Ansible from your laptop or CLI, AWX gives you a UI, API, inventory management, job scheduling, logging, and role-based access control for running Ansible playbooks in a centralized way.
 
 In simple terms, it makes Ansible easier to run in a team environment.
-
-The enterprise version of AWX is called Red Hat Ansible Automation Platform, which was earlier known as Ansible Tower.
 
 **Difference in simple terms:**
 
 **AWX**
-- Open-source project
+- Open-source upstream project
 - Community supported
 - Free to use
 - Good for learning and internal automation
@@ -31,13 +29,34 @@ The enterprise version of AWX is called Red Hat Ansible Automation Platform, whi
 - Paid subscription
 - Includes official support, security patches, automation analytics, and enterprise features
 
-So in this project I used AWX (open-source), but the architecture is almost the same as the enterprise automation platform used in companies.
+So in this project I used AWX (open-source), but the architecture is almost the same as the enterprise automation platform used in companies. It is deployed inside Kubernetes using Helm on AWS EKS.
+
+Inside AWX we configured:
+- Inventory for the EC2 fleet
+- Credentials for AWS access
+- Execution environments
+- Job templates
+- Connection to the Git repository that stores playbooks
+
+When a job runs, AWX fetches playbooks from the connected Git repository and executes them against the infrastructure.
 
 ## What I actually built (project explanation)
 
 So what I did in this project was I built a small automation platform on AWS. I created the infrastructure using Terraform and deployed everything inside an Amazon EKS cluster. Inside that Kubernetes cluster I installed AWX using Helm.
 
 The idea was to run AWX as a centralized automation service. Instead of running Ansible from my laptop, AWX runs playbooks from inside the cluster.
+
+**Golden AMI using Packer**
+
+Before creating the EC2 fleet, a Golden AMI was built using Packer.
+
+This AMI includes the base configuration required for the servers, such as:
+- Docker installation
+- SSM agent configuration
+- Base OS configuration
+
+Using a Golden AMI helps ensure that every instance in the fleet starts from a consistent base image.
+This is a common practice in many DevOps environments to standardize infrastructure.
 
 I also created a small EC2 fleet which acts like application servers. These servers were kept completely private — no SSH access and no inbound ports open. To manage them securely I used AWS Systems Manager. This allows commands to run on EC2 instances without opening SSH.
 
@@ -240,7 +259,7 @@ Once everything is inside the cluster, it becomes easier to integrate with other
 │   │   └── awx-secrets.yaml        # ExternalSecrets for DB + admin
 │   └── argocd-apps/
 │       └── awx.yaml                # ArgoCD Application for AWX
-└── packer/                         # Phase 2 — EC2 Golden AMI
+└── packer/                         # EC2 Golden AMI
     ├── aws-ubuntu.pkr.hcl
     └── setup-scripts/
         └── install.sh
@@ -260,7 +279,7 @@ Once everything is inside the cluster, it becomes easier to integrate with other
 | ESO | 0.12.1 (Helm) |
 | ALB Controller | 1.11.0 (Helm) |
 | RDS PostgreSQL | 16 |
-| Packer (Phase 2) | >= 1.9.0 |
+| Packer | >= 1.9.0 |
 
 
 ## Deployment Flow
