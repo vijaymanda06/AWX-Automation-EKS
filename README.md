@@ -1,63 +1,92 @@
 # Zero-Trust Immutable Infrastructure Pipeline
 
-## Architecture
+## Problem Statement (Why this project)
 
-```
-Terraform → AWS Infra → EKS → ArgoCD → AWX → Ansible → EC2 Fleet via SSM
-```
+In many companies there are a lot of servers running in cloud environments like AWS. DevOps teams often need to install software, run commands, deploy containers, or update configurations on those servers. Traditionally people used SSH to log into servers and run commands manually or through scripts. But this approach is not very secure or scalable, especially when you have dozens or hundreds of machines.
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                        VPC (10.0.0.0/16)                        │
-│                                                                  │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
-│  │  Public-1    │  │  Public-2    │  │  Public-3    │             │
-│  │  NAT GW      │  │              │  │              │             │
-│  │  ALB          │  │  ALB         │  │  ALB         │             │
-│  └──────┬───────┘  └──────────────┘  └──────────────┘             │
-│         │                                                         │
-│  ┌──────┴───────┐  ┌─────────────┐  ┌─────────────┐             │
-│  │  Private-1    │  │  Private-2   │  │  Private-3   │             │
-│  │  EKS Nodes   │  │  EKS Nodes   │  │  EKS Nodes   │             │
-│  │  RDS          │  │              │  │              │             │
-│  └──────────────┘  └──────────────┘  └──────────────┘             │
-│                                                                  │
-│         ┌──────────────────────────────────┐                     │
-│         │       EKS Cluster (K8s 1.33)     │                     │
-│         │  ┌──────────┐ ┌──────────┐       │                     │
-│         │  │  ArgoCD  │ │   AWX    │       │                     │
-│         │  └──────────┘ └──────────┘       │                     │
-│         │  ┌──────────┐ ┌──────────┐       │                     │
-│         │  │   ESO    │ │ ALB Ctrl │       │                     │
-│         │  └──────────┘ └──────────┘       │                     │
-│         └──────────────────────────────────┘                     │
-└──────────────────────────────────────────────────────────────────┘
-```
+Another problem is that CI/CD pipelines usually handle application builds, but there still needs to be a reliable way to run automation tasks on infrastructure. Teams need a centralized platform where automation can be executed safely, audited, and integrated with pipelines.
 
-## Project Phases
+So the idea of this project was to build a central automation platform that can trigger Ansible playbooks from pipelines and securely execute tasks on private servers without opening SSH access.
 
-| Phase | Scope | Status |
-|---|---|---|
-| **Phase 1** | EKS + ArgoCD + AWX + RDS + Secrets | ✅ Complete |
-| Phase 2 | Packer EC2 fleet + SSM + AWX inventory | Planned |
-| Phase 3 | Prometheus + Grafana + CloudWatch | Future |
+## What AWX / Ansible Tower is
 
-## Security Features
+AWX is basically a web-based automation platform for Ansible. Instead of running Ansible from your laptop or CLI, AWX gives you a UI, API, inventory management, job scheduling, logging, and role-based access control.
 
-- **IMDSv2** enforced on all EKS nodes
-- **Encrypted gp3** EBS volumes
-- **Private subnets** for EKS nodes and RDS
-- **IRSA** (IAM Roles for Service Accounts) — no static credentials
-- **AWS Secrets Manager** with ESO — secrets never in Git
-- **No SSH** — SSM Session Manager only (Phase 2)
+In simple terms, it makes Ansible easier to run in a team environment.
 
-## Prerequisites
+The enterprise version of AWX is called Red Hat Ansible Automation Platform, which was earlier known as Ansible Tower.
 
-- [Terraform](https://developer.hashicorp.com/terraform/install) >= 1.9.0
-- [AWS CLI](https://aws.amazon.com/cli/) configured
-- [kubectl](https://kubernetes.io/docs/tasks/tools/) installed
-- [Helm](https://helm.sh/docs/intro/install/) installed
-- [Packer](https://developer.hashicorp.com/packer/install) (Phase 2)
+**Difference in simple terms:**
+
+**AWX**
+- Open-source project
+- Community supported
+- Free to use
+- Good for learning and internal automation
+
+**Red Hat Ansible Automation Platform (Ansible Tower)**
+- Enterprise product from Red Hat
+- Paid subscription
+- Includes official support, security patches, automation analytics, and enterprise features
+
+So in this project I used AWX (open-source), but the architecture is almost the same as the enterprise automation platform used in companies.
+
+## What I actually built (project explanation)
+
+So what I did in this project was I built a small automation platform on AWS. I created the infrastructure using Terraform and deployed everything inside an Amazon EKS cluster. Inside that Kubernetes cluster I installed AWX using Helm.
+
+The idea was to run AWX as a centralized automation service. Instead of running Ansible from my laptop, AWX runs playbooks from inside the cluster.
+
+I also created a small EC2 fleet which acts like application servers. These servers were kept completely private — no SSH access and no inbound ports open. To manage them securely I used AWS Systems Manager. This allows commands to run on EC2 instances without opening SSH.
+
+Then I connected the automation workflow with GitLab CI pipelines. Whenever a pipeline runs, it calls the AWX API, which triggers an Ansible playbook. That playbook then uses SSM to execute commands on the private EC2 instances.
+
+For testing I used simple examples like deploying Docker containers (nginx or redis) on those servers. The interesting part is that the servers were completely private and automation still worked through AWS SSM.
+
+I also added some security improvements like restricting outbound network access and using VPC endpoints so the servers only communicate with AWS services instead of the public internet.
+
+So the overall flow looks like this:
+
+`GitLab CI pipeline → AWX API → Ansible playbook → AWS SSM → Private EC2 fleet`
+
+This basically demonstrates how infrastructure automation can be done in a secure way without logging into servers manually.
+
+## Is EKS really necessary for AWX?
+
+Not really. EKS is not mandatory to run AWX. I chose EKS mainly because I wanted to run the automation platform in a containerized and scalable way, but there are multiple ways to deploy AWX depending on the team size and complexity.
+
+In my project I deployed AWX on Amazon EKS using the Helm chart. The reason was mainly to simulate how a platform team might run shared tools inside Kubernetes. Running it on EKS also makes it easier to scale the workers and manage upgrades because everything is container based.
+
+But honestly for smaller teams EKS can be a bit overkill.
+
+### Other ways AWX can be deployed
+
+One option is to run AWX on Amazon ECS. That works fine because AWX itself runs in containers anyway. ECS is easier to operate compared to Kubernetes since AWS manages a lot of the complexity. For a small team that just needs a central automation server, ECS could be a simpler option.
+
+Another option is running AWX on a single VM or a few VMs. Some teams install AWX using Docker Compose or run it on a standalone Kubernetes distribution like k3s or microk8s. This is cheaper and simpler from a cost perspective, but it becomes harder to maintain over time. You have to handle upgrades, backups, and scaling manually.
+
+So basically there are three common approaches:
+
+**VM based deployment**
+- AWX running on a single server
+- Cheapest option
+- But harder to scale and maintain
+
+**Container platform like ECS**
+- Easier to manage than Kubernetes
+- Good middle ground for small teams
+
+**Kubernetes platform like EKS**
+- More complex
+- But better for scaling and running multiple platform services
+
+### Why Kubernetes is often used
+
+Even though Kubernetes adds complexity, many companies already run their internal tooling on Kubernetes. So AWX becomes just another service running in the cluster.
+
+In my setup AWX was deployed with Helm and used a PostgreSQL database which in AWS was backed by Amazon RDS. AWX also needs things like Redis and persistent storage, so running it in Kubernetes makes it easier to manage those components as containers.
+
+Once everything is inside the cluster, it becomes easier to integrate with other tools like monitoring stacks or GitOps tools.
 
 ## Project Structure
 
@@ -90,63 +119,6 @@ Terraform → AWS Infra → EKS → ArgoCD → AWX → Ansible → EC2 Fleet via
         └── install.sh
 ```
 
-## Quick Start
-
-### 1. Configure Variables
-
-```bash
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your values
-```
-
-### 2. Deploy Infrastructure
-
-```bash
-terraform init
-terraform plan
-terraform apply
-```
-
-This creates: VPC, EKS, RDS, Secrets Manager, ALB Controller, ArgoCD, ESO, AWX Operator.
-
-### 3. Connect to EKS
-
-```bash
-# Use the output command
-aws eks update-kubeconfig --name zerotrust-eks --region us-east-1
-kubectl get nodes
-```
-
-### 4. Apply Kubernetes Manifests
-
-```bash
-# ClusterSecretStore
-kubectl apply -f kubernetes/external-secrets/cluster-store.yaml
-
-# AWX secrets (pulls from Secrets Manager)
-kubectl apply -f kubernetes/external-secrets/awx-secrets.yaml
-
-# AWX instance
-kubectl apply -f kubernetes/awx/awx-instance.yaml
-
-# (Optional) ArgoCD Application for GitOps
-kubectl apply -f kubernetes/argocd-apps/awx.yaml
-```
-
-### 5. Access UIs
-
-```bash
-# ArgoCD password
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
-
-# AWX password
-aws secretsmanager get-secret-value --secret-id zerotrust/awx/admin-credentials --query SecretString --output text | jq -r .password
-
-# Get ALB URLs
-kubectl get ingress -A
-```
-
 ## Technology Stack
 
 | Component | Version |
@@ -163,11 +135,6 @@ kubectl get ingress -A
 | RDS PostgreSQL | 16 |
 | Packer (Phase 2) | >= 1.9.0 |
 
-## Secrets Flow
-
-```
-AWS Secrets Manager → External Secrets Operator → K8s Secrets → AWX/ArgoCD
-```
 
 ## Deployment Flow
 
