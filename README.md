@@ -1,5 +1,7 @@
 # Zero-Trust Immutable Infrastructure Pipeline
 
+![AWX Dashboard](Assets/awx-dashboard.png)
+
 ## Problem Statement (Why this project)
 
 In many companies there are a lot of servers running in cloud environments like AWS. DevOps teams often need to install software, run commands, deploy containers, or update configurations on those servers. Traditionally people used SSH to log into servers and run commands manually or through scripts. But this approach is not very secure or scalable, especially when you have dozens or hundreds of machines.
@@ -48,6 +50,8 @@ I also added some security improvements like restricting outbound network access
 So the overall flow looks like this:
 
 `GitLab CI pipeline → AWX API → Ansible playbook → AWS SSM → Private EC2 fleet`
+
+![GitLab Pipeline](Assets/gitlab-pipeline.png)
 
 This basically demonstrates how infrastructure automation can be done in a secure way without logging into servers manually.
 
