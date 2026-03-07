@@ -1,6 +1,6 @@
 # Zero-Trust Immutable Infrastructure Pipeline
 
-![AWX Dashboard](Assets/awx-dashboard.png)
+![Architecture Overview](Assets/architecture-overview.png)
 
 ## Problem Statement (Why this project)
 
@@ -51,7 +51,130 @@ So the overall flow looks like this:
 
 `GitLab CI pipeline → AWX API → Ansible playbook → AWS SSM → Private EC2 fleet`
 
+## 1️⃣ Kubernetes Nodes (EKS)
+
+```bash
+$ kubectl get nodes
+NAME                          STATUS   ROLES    AGE   VERSION
+ip-10-0-47-119.ec2.internal   Ready    <none>   11h   v1.32.12-eks-efcacff
+ip-10-0-9-101.ec2.internal    Ready    <none>   11h   v1.32.12-eks-efcacff
+```
+
+## 2️⃣ Kubernetes Pods (Platform services)
+
+```bash
+$ kubectl get pods -A
+
+NAMESPACE          NAME                                                READY   STATUS      RESTARTS   AGE
+argocd             argocd-application-controller-0                     1/1     Running     0          10h
+argocd             argocd-applicationset-controller-6786676b4d-r7kg8   1/1     Running     0          10h
+argocd             argocd-dex-server-86f976c75-pndzd                   1/1     Running     0          10h
+argocd             argocd-notifications-controller-8c68bc66d-c7zjn     1/1     Running     0          10h
+argocd             argocd-redis-5f9fd8f7fb-2nxgz                       1/1     Running     0          10h
+argocd             argocd-repo-server-694d5579d9-f84pd                 1/1     Running     0          10h
+argocd             argocd-server-7c6d5847dc-vw852                      1/1     Running     0          10h
+
+awx                awx-operator-controller-manager-799967c78c-vz2gs    2/2     Running     0          10h
+awx                awx-task-547bbcd565-gmtm4                           4/4     Running     0          10h
+awx                awx-web-94d574749-mnjjp                             3/3     Running     0          10h
+awx                awx-migration-24.6.1-t69zq                          0/1     Completed   0          10h
+
+external-secrets   external-secrets-8545698689-bdbcn                   1/1     Running     0          10h
+external-secrets   external-secrets-cert-controller-968fb546c-mmbwc    1/1     Running     0          10h
+external-secrets   external-secrets-webhook-58fd6f5497-cxvfq           1/1     Running     0          10h
+
+kube-system        aws-load-balancer-controller-78d95f6f5b-xxbpb       1/1     Running     0          10h
+kube-system        aws-load-balancer-controller-78d95f6f5b-z9g24       1/1     Running     0          10h
+kube-system        aws-node-dffqb                                      2/2     Running     0          11h
+kube-system        aws-node-x82jc                                      2/2     Running     0          11h
+kube-system        coredns-5ffbd497c5-pbgc8                            1/1     Running     0          10h
+kube-system        coredns-5ffbd497c5-zqzrq                            1/1     Running     0          10h
+kube-system        ebs-csi-controller-5b7b67d46-fwxk5                  6/6     Running     0          11h
+kube-system        ebs-csi-controller-5b7b67d46-gl45t                  6/6     Running     0          11h
+kube-system        ebs-csi-node-69zqr                                  3/3     Running     0          11h
+kube-system        ebs-csi-node-gfsgn                                  3/3     Running     0          11h
+kube-system        kube-proxy-lcm5d                                    1/1     Running     0          11h
+kube-system        kube-proxy-rxckc                                    1/1     Running     0          11h
+```
+
+## 3️⃣ Docker Containers running on EC2 fleet
+
+```bash
+$ sudo docker ps
+
+CONTAINER ID   IMAGE     COMMAND                  CREATED         STATUS         PORTS                                 NAMES
+c247b52801dc   redis:7   "docker-entrypoint.s…"   21 minutes ago  Up 21 minutes  0.0.0.0:6379->6379/tcp                redis
+72bb536a13f0   nginx     "/docker-entrypoint.…"   3 hours ago     Up 3 hours     0.0.0.0:80->80/tcp                    nginx
+```
+
+## 4️⃣ Open Ports on EC2 Instance
+
+```bash
+$ sudo ss -tulnp
+
+Netid   State    Recv-Q   Send-Q   Local Address:Port    Peer Address:Port   Process
+tcp     LISTEN   0        4096     0.0.0.0:80             0.0.0.0:*           docker-proxy
+tcp     LISTEN   0        4096     [::]:80                [::]:*              docker-proxy
+udp     UNCONN   0        0        127.0.0.53:53          0.0.0.0:*           systemd-resolved
+```
+*(Shows nginx container exposing port 80)*
+
+## 5️⃣ SSM Command Result
+
+Example output when Redis was deployed through AWX:
+
+```json
+{
+  "CommandId": "7aa9fa07-d792-4b86-b07e-dee300ea0996",
+  "InstanceId": "i-088cd3a8e7968a5cc",
+  "Status": "Success",
+  "DocumentName": "AWS-RunShellScript",
+  "Output": "Status: Downloaded newer image for redis:7"
+}
+```
+
+## 6️⃣ Architecture Summary
+
+```text
+GitLab CI Pipeline
+        │
+        ▼
+AWX (Ansible Automation Platform)
+        │
+        ▼
+Ansible Playbook Execution
+        │
+        ▼
+AWS Systems Manager (SSM)
+        │
+        ▼
+Private EC2 Fleet
+        │
+        ▼
+Docker Containers (Nginx / Redis)
+```
+
+**Running on:**
+
+- **AWS EKS** → Hosting AWX
+- **Terraform** → Infrastructure provisioning
+- **GitLab CI** → Automation trigger
+
+
+![AWX Dashboard](Assets/awx-dashboard.png)
+
 ![GitLab Pipeline](Assets/gitlab-pipeline.png)
+
+### Automation Proof
+
+**AWX Job Template & Execution:**
+![AWX Template](Assets/awx-template.png)
+![AWX Job](Assets/awx-job.png)
+
+**Private Nodes & Deployment Success:**
+![SSM Nodes](Assets/ssm-nodes.png)
+![Nginx Node 1](Assets/nginx-node1.png)
+![Nginx Node 2](Assets/nginx-node2.png)
 
 This basically demonstrates how infrastructure automation can be done in a secure way without logging into servers manually.
 
