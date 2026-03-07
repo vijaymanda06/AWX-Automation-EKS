@@ -163,32 +163,7 @@ Example output when Redis was deployed through AWX:
 }
 ```
 
-## 6️⃣ Architecture Summary
 
-```text
-GitLab CI Pipeline
-        │
-        ▼
-AWX (Ansible Automation Platform)
-        │
-        ▼
-Ansible Playbook Execution
-        │
-        ▼
-AWS Systems Manager (SSM)
-        │
-        ▼
-Private EC2 Fleet
-        │
-        ▼
-Docker Containers (Nginx / Redis)
-```
-
-**Running on:**
-
-- **AWS EKS** → Hosting AWX
-- **Terraform** → Infrastructure provisioning
-- **GitLab CI** → Automation trigger
 
 
 ![AWX Dashboard](Assets/awx-dashboard.png)
