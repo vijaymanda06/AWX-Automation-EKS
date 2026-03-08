@@ -183,42 +183,6 @@ Example output when Redis was deployed through AWX:
 
 This basically demonstrates how infrastructure automation can be done in a secure way without logging into servers manually.
 
-## Is EKS really necessary for AWX?
-
-Not really. EKS is not mandatory to run AWX. I chose EKS mainly because I wanted to run the automation platform in a containerized and scalable way, but there are multiple ways to deploy AWX depending on the team size and complexity.
-
-In my project I deployed AWX on Amazon EKS using the Helm chart. The reason was mainly to simulate how a platform team might run shared tools inside Kubernetes. Running it on EKS also makes it easier to scale the workers and manage upgrades because everything is container based.
-
-But honestly for smaller teams EKS can be a bit overkill.
-
-### Other ways AWX can be deployed
-
-One option is to run AWX on Amazon ECS. That works fine because AWX itself runs in containers anyway. ECS is easier to operate compared to Kubernetes since AWS manages a lot of the complexity. For a small team that just needs a central automation server, ECS could be a simpler option.
-
-Another option is running AWX on a single VM or a few VMs. Some teams install AWX using Docker Compose or run it on a standalone Kubernetes distribution like k3s or microk8s. This is cheaper and simpler from a cost perspective, but it becomes harder to maintain over time. You have to handle upgrades, backups, and scaling manually.
-
-So basically there are three common approaches:
-
-**VM based deployment**
-- AWX running on a single server
-- Cheapest option
-- But harder to scale and maintain
-
-**Container platform like ECS**
-- Easier to manage than Kubernetes
-- Good middle ground for small teams
-
-**Kubernetes platform like EKS**
-- More complex
-- But better for scaling and running multiple platform services
-
-### Why Kubernetes is often used
-
-Even though Kubernetes adds complexity, many companies already run their internal tooling on Kubernetes. So AWX becomes just another service running in the cluster.
-
-In my setup AWX was deployed with Helm and used a PostgreSQL database which in AWS was backed by Amazon RDS. AWX also needs things like Redis and persistent storage, so running it in Kubernetes makes it easier to manage those components as containers.
-
-Once everything is inside the cluster, it becomes easier to integrate with other tools like monitoring stacks or GitOps tools.
 
 ## Project Structure
 
