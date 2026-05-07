@@ -1,4 +1,4 @@
-# Zero-Trust Immutable Infrastructure Pipeline
+# Immutable Infrastructure Pipeline
 
 ![Architecture Overview](Assets/architecture-overview.png)
 
