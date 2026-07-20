@@ -1,6 +1,6 @@
 # Immutable Infrastructure Pipeline
 
-![Architecture Overview](Assets/architecture-overview.png)
+![Architecture Overview](Assets/Main.png)
 
 ## Problem Statement (Why this project)
 
